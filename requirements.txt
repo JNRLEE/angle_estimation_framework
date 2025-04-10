@@ -1,20 +1,20 @@
 # Core Libraries
-torch>=2.0.0
-torchvision>=0.15.0
-# torchaudio # Add if using torchaudio features
-numpy>=1.20.0
-pillow>=8.0.0
+torch>=2.6.0
+torchvision>=0.20.0
+torchaudio>=2.5.0 # Added for audio processing
+numpy>=1.26.0
+pillow>=10.0.0
 
 # Data Handling & Processing
-librosa>=0.8.0
-PyYAML>=5.4 # For loading YAML config files
+librosa>=0.10.0
+PyYAML>=6.0 # For loading YAML config files
 
 # Models (if using Hugging Face)
-transformers>=4.10.0 # For SwinTransformerBackbone
+transformers>=4.38.0 # For SwinTransformerBackbone
 # timm # Optional, if using timm models as backbones
 
 # Utilities
-tqdm # For progress bars (optional, but nice)
-matplotlib # For plotting (optional, e.g., saving loss curves)
+tqdm>=4.66.0 # For progress bars
+matplotlib>=3.10.0 # For plotting (saving loss curves, etc.)
 
-# Specify versions as needed, e.g., torch==1.13.1
+# Specify versions as aligned with Python 3.12 compatibility
