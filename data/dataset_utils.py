@@ -1,6 +1,38 @@
 import re
 import os
 
+def extract_angle_from_path(file_path):
+    """
+    Extract angle information from file path in the new folder structure.
+    
+    Description:
+        Extracts angle value from the directory structure where files are organized
+        in angle-specific folders (e.g., deg000, deg018).
+    
+    Args:
+        file_path (str): The full path to the audio file
+    
+    Returns:
+        int or None: The extracted angle value as an integer, or None if not found
+        
+    References:
+        - Regular expressions: https://docs.python.org/3/library/re.html
+    """
+    # Extract angle from path (e.g., .../deg018/box/file.wav -> 18)
+    path_parts = file_path.split(os.sep)
+    for part in path_parts:
+        if part.startswith('deg'):
+            try:
+                # Extract the angle value from the folder name
+                angle_match = re.search(r'deg(\d+)', part)
+                if angle_match:
+                    return int(angle_match.group(1))
+            except ValueError:
+                pass
+    
+    # If angle not found in path, try extracting from filename as fallback
+    return extract_angle_from_filename(file_path)
+
 def extract_angle_from_filename(filename):
     """
     Extract angle information from filename, supporting different naming formats.
@@ -37,16 +69,46 @@ def extract_angle_from_filename(filename):
     
     return None
 
-def extract_metadata_from_filename(filename):
+def extract_material_from_path(file_path):
     """
-    Extract comprehensive metadata from filename including material, frequency, index, etc.
+    Extract material information from file path in the new folder structure.
     
     Description:
-        Parses the filename to extract metadata such as material type, frequency,
-        sequence index, and angle information based on common naming patterns.
+        Extracts material type (box, plastic) from the directory structure.
     
     Args:
-        filename (str): The filename to extract metadata from
+        file_path (str): The full path to the audio file
+    
+    Returns:
+        str or None: The extracted material type, or None if not found
+    """
+    # Extract material from path (e.g., .../deg018/box/file.wav -> box)
+    path_parts = file_path.split(os.sep)
+    materials = ['box', 'plastic']
+    
+    for part in path_parts:
+        if part.lower() in materials:
+            return part.lower()
+    
+    # If material not found in path, try extracting from filename
+    base_filename = os.path.basename(file_path)
+    name_parts = os.path.splitext(base_filename)[0].split('_')
+    
+    if name_parts and name_parts[0].lower() in materials:
+        return name_parts[0].lower()
+    
+    return None
+
+def extract_metadata_from_filename(filename):
+    """
+    Extract comprehensive metadata from filename and path including material, frequency, index, etc.
+    
+    Description:
+        Parses the file path and filename to extract metadata such as material type, frequency,
+        sequence index, and angle information based on the new directory structure.
+    
+    Args:
+        filename (str): The full path to the audio file
     
     Returns:
         dict: Dictionary containing extracted metadata fields
@@ -65,8 +127,17 @@ def extract_metadata_from_filename(filename):
     }
     
     try:
-        # Material (usually the first part)
-        if parts and len(parts) > 0:
+        # Extract angle from path
+        angle = extract_angle_from_path(filename)
+        if angle is not None:
+            metadata['angle'] = angle
+        
+        # Extract material from path
+        material = extract_material_from_path(filename)
+        if material:
+            metadata['material'] = material
+        elif parts and len(parts) > 0:
+            # Fallback to extracting from filename
             metadata['material'] = parts[0]
         
         # Frequency (part containing 'hz')
@@ -77,37 +148,70 @@ def extract_metadata_from_filename(filename):
             except ValueError:
                 pass
         
-        # Index - handle both explicit index parts and numeric parts after deg
-        # This handles patterns like:
-        # - box_sinewave_deg018_1_500hz_00.wav (where 1 is the index)
-        # - box_sinewave_deg000_500hz_03.wav (where no explicit index exists)
-        
-        # Check for single digit after deg pattern
-        index_after_deg = False
-        for i, part in enumerate(parts):
-            if 'deg' in part.lower() and i+1 < len(parts):
-                next_part = parts[i+1]
-                if len(next_part) == 1 and next_part.isdigit():
-                    metadata['index'] = int(next_part)
-                    index_after_deg = True
-                    break
-        
-        # If no index found after deg, look for standalone digits
-        if not index_after_deg:
-            for part in parts:
-                if part.isdigit() and len(part) == 1:
-                    metadata['index'] = int(part)
-                    break
-        
-        # Extract the angle
-        angle = extract_angle_from_filename(filename)
-        if angle is not None:
-            metadata['angle'] = angle
+        # Index - usually the last part (after frequency)
+        for part in reversed(parts):
+            if part.isdigit() and len(part) <= 2:  # Typically index is 1-2 digits
+                metadata['index'] = int(part)
+                break
     
     except Exception as e:
         print(f"Warning: Error extracting metadata from {filename}: {e}")
     
     return metadata
+
+def get_files_from_hierarchical_structure(root_dir, format_filter=None):
+    """
+    Recursively find all files in the hierarchical structure.
+    
+    Description:
+        Traverses the hierarchical directory structure to find all audio files,
+        organized as root_dir/deg{angle}/{material}/{files}.
+    
+    Args:
+        root_dir (str): Root directory containing the hierarchical structure
+        format_filter (list, optional): List of file extensions to include (e.g., ['wav'])
+    
+    Returns:
+        list: List of file paths found in the structure
+    """
+    all_files = []
+    
+    # Ensure format_filter is a list
+    if format_filter and not isinstance(format_filter, list):
+        format_filter = [format_filter]
+    
+    # Walk through the directory structure
+    for angle_dir in sorted(os.listdir(root_dir)):
+        angle_path = os.path.join(root_dir, angle_dir)
+        
+        # Skip if not a directory or doesn't match deg pattern
+        if not os.path.isdir(angle_path) or not angle_dir.startswith('deg'):
+            continue
+            
+        for material_dir in sorted(os.listdir(angle_path)):
+            material_path = os.path.join(angle_path, material_dir)
+            
+            # Skip if not a directory or not a valid material
+            if not os.path.isdir(material_path) or material_dir.lower() not in ['box', 'plastic']:
+                continue
+                
+            # Get all files in this material directory
+            for file in os.listdir(material_path):
+                file_path = os.path.join(material_path, file)
+                
+                # Skip if not a file
+                if not os.path.isfile(file_path):
+                    continue
+                    
+                # Apply format filter if specified
+                if format_filter:
+                    ext = os.path.splitext(file)[1].lower().lstrip('.')
+                    if ext not in format_filter:
+                        continue
+                        
+                all_files.append(file_path)
+    
+    return all_files
 
 def filter_files_by_metadata(files, filter_criteria):
     """

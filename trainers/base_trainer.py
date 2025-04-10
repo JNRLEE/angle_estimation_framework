@@ -157,7 +157,12 @@ class BaseTrainer:
         self.criterion = None
         self.best_metric_value = float('inf') if self.early_stopping_mode == 'min' else float('-inf')
         self.epochs_no_improve = 0
-        self.history = {'train_loss': [], 'val_loss': [], 'val_accuracy': [], 'val_mae': [], 'lr': []}
+        self.history = {
+            'train_loss': [], 'val_loss': [], 'test_loss': [],
+            'val_accuracy': [], 'val_mae': [], 
+            'test_accuracy': [], 'test_mae': [],
+            'lr': []
+        }
 
         # 根據提供的參數確定初始化流程
         self._setup_components(model, train_loader, val_loader, test_loader)
