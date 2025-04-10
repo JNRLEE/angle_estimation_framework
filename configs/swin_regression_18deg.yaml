@@ -1,7 +1,8 @@
 # Configuration for Swin Transformer Regression on 18-degree dataset
+# cd /Users/sbplab/jnrle && python -m angle_estimation_framework.scripts.train --config angle_estimation_framework/configs/swin_regression_18deg.yaml --seed 42
 
 data:
-  data_dir: "D:/Transformer_training_Example/sinetone_18degree_sliced/data"  # 修改為絕對路徑
+  data_dir: "/Users/sbplab/jnrle/sinetone_link/step_018_sliced"  # 修改為絕對路徑
   # Filtering specific to this dataset/experiment
   material_filter: "plastic"  # or "all", "plastic", "box"
   frequency_filter: [500]
@@ -14,7 +15,7 @@ data:
   # Optional: Define label mapping if needed (e.g., if filenames have string labels)
   # label_mapping: null
   # Optional: Regex to extract label (angle) from filename
-  filename_pattern: 'deg(\d+)'
+  filename_pattern: 'deg([0-9]+)'
 
 audio_params:
   sample_rate: 16000 # Target sample rate (resampling might be needed if source differs)
@@ -81,9 +82,9 @@ scheduler:
   #   gamma: 0.1
 
 training:
-  epochs: 100 # Reduced for example
-  batch_size: 32
-  device: "cuda" # Or "cpu"
+  epochs: 3 # 減少更多，以便快速測試
+  batch_size: 16 # 減少批次大小
+  device: "cpu" # Changed from "cuda" to "cpu"
   num_workers: 0 # Set based on system capability
   # Optional: Fine-tuning schedule
   unfreeze_backbone_epoch: 5 # Epoch to unfreeze backbone layers (requires logic in trainer or script)
@@ -92,7 +93,7 @@ training:
   gradient_clipping:
     max_norm: 1.0
   # Optional: Early Stopping
-  early_stopping_patience: 10
+  early_stopping_patience: 1 # 也降低 early stopping 的 patience，以快速測試
   early_stopping_metric: "val_mae" # Monitor validation MAE (lower is better)
   early_stopping_mode: "min"
 

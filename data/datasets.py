@@ -5,8 +5,8 @@ import torch
 from torch.utils.data import Dataset
 import numpy as np
 
-from utils.audio_utils import load_wav, compute_mel_spectrogram, pad_or_truncate, analyze_audio_sample_rates
-from .dataset_utils import extract_metadata_from_filename, filter_files_by_metadata
+from angle_estimation_framework.utils.audio_utils import load_wav, compute_mel_spectrogram, pad_or_truncate, analyze_audio_sample_rates
+from .dataset_utils import extract_metadata_from_filename, filter_files_by_metadata, get_files_from_hierarchical_structure
 
 class AudioSpectrogramDataset(Dataset):
     """
@@ -22,7 +22,7 @@ class AudioSpectrogramDataset(Dataset):
                 - audio_params (dict): n_fft, hop_length, n_mels, target_length, sample_rate
                 - data_filtering (dict): material_filter, frequency_filter, index_filter, format_filter, angle_values
                 - filename_pattern (str, optional): Regex pattern to extract info (e.g., angle) from filename.
-                                                      Needs capturing groups. Example: r"deg(\d+)" for angle.
+                                                      Needs capturing groups. Example: r"deg(\\d+)" for angle.
                 - label_mapping (dict, optional): Maps extracted string labels (like angle) to numerical indices.
                                                     If None, uses the extracted value directly (assuming it's numeric).
         """
@@ -76,14 +76,11 @@ class AudioSpectrogramDataset(Dataset):
             'angle_values': self.angle_values
         }
         
-        # Find all files that match the format filter
-        all_files = []
-        for fmt in self.format_filter:
-            search_pattern = os.path.join(self.data_dir, f"*.{fmt}")
-            all_files.extend(glob.glob(search_pattern, recursive=False))
+        # Use the hierarchical file finding function to get all files
+        all_files = get_files_from_hierarchical_structure(self.data_dir, self.format_filter)
         
         if not all_files:
-            print(f"Warning: No files found matching pattern {self.data_dir}/*.{self.format_filter}")
+            print(f"Warning: No files found in hierarchical structure at {self.data_dir}")
             return
 
         # Analyze sample rates before filtering to give summary information
@@ -149,9 +146,15 @@ class AudioSpectrogramDataset(Dataset):
             # Ensure contiguous tensor
             processed_spectrogram = processed_spectrogram.contiguous()
 
-            # Return spectrogram and label (convert label to tensor)
-            # Using float for label to support regression directly
-            return processed_spectrogram, torch.tensor(label, dtype=torch.float)
+            # 檢查filename_pattern是否存在，判斷是分類還是回歸任務
+            is_classification = self.filename_pattern is not None and 'deg' in self.filename_pattern
+
+            # Return spectrogram and label (convert label to appropriate tensor type)
+            # 使用 Long 型別用於分類任務，Float 型別用於回歸任務
+            if is_classification:
+                return processed_spectrogram, torch.tensor(label, dtype=torch.long)
+            else:
+                return processed_spectrogram, torch.tensor(label, dtype=torch.float)
 
         except Exception as e:
             print(f"Error processing file {file_path} in __getitem__: {str(e)}")
